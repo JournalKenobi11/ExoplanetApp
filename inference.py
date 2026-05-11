@@ -1,11 +1,17 @@
-import numpy as np
-import torch
-import lightkurve as lk
-from astroquery.mast import Observations
-from astropy.io import fits
-import requests
-import tempfile
+import io
 import os
+import sys
+import sqlite3
+import tempfile
+import warnings
+
+import numpy as np
+import requests
+import torch
+
+from astropy.io import fits
+from astroquery.mast import Observations
+from astropy.utils.exceptions import AstropyWarning
 
 from preprocess import (
     zscore_signal,
@@ -16,11 +22,41 @@ from preprocess import (
 from model import TessPrecisionRecallNet
 
 
+warnings.simplefilter(
+    "ignore",
+    AstropyWarning
+)
+
+
+DB_NAME = "tess_cache.db"
+
+PREPROCESS_VERSION = "v1_zscore_3197"
+
+
 device = torch.device("cpu")
 
 
+THRESHOLD = 0.50
+
+
+def resource_path(relative_path):
+
+    try:
+        base_path = sys._MEIPASS
+
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(
+        base_path,
+        relative_path
+    )
+
+
 checkpoint = torch.load(
-    "tess_precision_recall_model_hardfp.pth",
+    resource_path(
+        "tess_precision_recall_model_hardfp.pth"
+    ),
     map_location=device
 )
 
@@ -36,7 +72,111 @@ model.to(device)
 model.eval()
 
 
-THRESHOLD = 0.50
+def initialize_database():
+
+    conn = sqlite3.connect(DB_NAME)
+
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS lightcurves (
+
+            tic_id INTEGER PRIMARY KEY,
+
+            flux BLOB NOT NULL,
+
+            preprocessing TEXT NOT NULL
+        )
+        """
+    )
+
+    conn.commit()
+
+    conn.close()
+
+
+initialize_database()
+
+
+def serialize_array(array):
+
+    buffer = io.BytesIO()
+
+    np.save(buffer, array)
+
+    return buffer.getvalue()
+
+
+def deserialize_array(blob):
+
+    buffer = io.BytesIO(blob)
+
+    buffer.seek(0)
+
+    return np.load(buffer)
+
+
+def load_cached_flux(tic_id):
+
+    conn = sqlite3.connect(DB_NAME)
+
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        SELECT flux, preprocessing
+        FROM lightcurves
+        WHERE tic_id = ?
+        """,
+        (tic_id,)
+    )
+
+    row = cursor.fetchone()
+
+    conn.close()
+
+    if row is None:
+        return None
+
+    flux_blob, preprocessing = row
+
+    if preprocessing != PREPROCESS_VERSION:
+        return None
+
+    flux = deserialize_array(flux_blob)
+
+    return flux.astype(np.float32)
+
+
+def save_flux_to_cache(tic_id, flux):
+
+    conn = sqlite3.connect(DB_NAME)
+
+    cursor = conn.cursor()
+
+    flux_blob = serialize_array(flux)
+
+    cursor.execute(
+        """
+        INSERT OR REPLACE INTO lightcurves
+        (
+            tic_id,
+            flux,
+            preprocessing
+        )
+        VALUES (?, ?, ?)
+        """,
+        (
+            tic_id,
+            flux_blob,
+            PREPROCESS_VERSION
+        )
+    )
+
+    conn.commit()
+
+    conn.close()
 
 
 def resize_flux(flux, target_len=3197):
@@ -70,7 +210,7 @@ def resize_flux(flux, target_len=3197):
     return resized.astype(np.float32)
 
 
-def fetch_tic_flux(tic_id):
+def download_tic_flux(tic_id):
 
     obs = Observations.query_criteria(
         target_name=str(tic_id),
@@ -163,15 +303,49 @@ def fetch_tic_flux(tic_id):
 
     finally:
 
-        os.remove(tmp_path)
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+
+
+def fetch_tic_flux(tic_id):
+
+    cached_flux = load_cached_flux(tic_id)
+
+    if cached_flux is not None:
+
+        print(
+            f"TIC {tic_id}: loaded from cache"
+        )
+
+        return cached_flux
+
+    print(
+        f"TIC {tic_id}: downloading from MAST"
+    )
+
+    flux = download_tic_flux(tic_id)
+
+    flux = resize_flux(flux)
+
+    flux = zscore_signal(flux)
+
+    save_flux_to_cache(
+        tic_id,
+        flux
+    )
+
+    print(
+        f"TIC {tic_id}: cached successfully"
+    )
+
+    return flux
+
 
 def run_inference(tic_id):
 
     flux = fetch_tic_flux(tic_id)
 
-    flux = resize_flux(flux)
-
-    raw = zscore_signal(flux)
+    raw = flux
 
     fft = generate_fft_features(raw)
 
