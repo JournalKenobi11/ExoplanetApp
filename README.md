@@ -301,7 +301,6 @@ Potential future directions include:
 - GPU acceleration
 - cloud synchronization
 
-```markdown id="n4k8vq"
 ---
 
 # Long-Term Vision
