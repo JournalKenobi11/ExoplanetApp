@@ -62,6 +62,7 @@ FFT + BLS extraction
 CNN inference
 ↓
 candidate ranking
+```
 
  ---
 
@@ -211,6 +212,7 @@ TransitAI/
     ├── model.py
     └── preprocess.py
 
+```
 ---
 
 # Installation
@@ -338,6 +340,7 @@ candidate database
 ranking and filtering
 ↓
 scientific review
+```
 
 ---
 
