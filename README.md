@@ -1,6 +1,12 @@
 # TransitAI
 
-TransitAI is a desktop application for detecting potential exoplanet candidates from NASA TESS lightcurve data using deep learning and astronomical signal analysis.
+
+TransitAI is an AI-powered exoplanet detection and astronomical signal analysis application built using PyTorch, TESS lightcurve data, convolutional neural networks (CNNs), FFT-based frequency analysis, and Box Least Squares (BLS) transit extraction.
+
+The project automatically downloads and processes NASA TESS observations, analyzes stellar brightness variations, and identifies potential exoplanet transit candidates using deep learning and multi-branch signal processing architectures.
+
+TransitAI combines astronomy, machine learning, time-series analysis, and real-world scientific data processing into a practical exoplanet candidate screening system.
+
 
 The application combines:
 - convolutional neural networks,
@@ -27,6 +33,37 @@ TESS continuously measures stellar brightness over time. These measurements are 
 TransitAI analyzes these brightness sequences and attempts to determine whether the signal contains patterns consistent with a planetary transit.
 
 ---
+
+# Current Workflow
+
+The current version of TransitAI operates as a manual-query inference system.
+
+Users provide:
+- one or more TESS TIC IDs,
+
+and the application:
+1. downloads corresponding TESS lightcurve data,
+2. preprocesses the signal,
+3. extracts FFT and BLS features,
+4. runs CNN inference,
+5. ranks potential exoplanet candidates by probability.
+
+Current pipeline:
+
+```text
+TIC ID
+↓
+TESS data retrieval
+↓
+signal preprocessing
+↓
+FFT + BLS extraction
+↓
+CNN inference
+↓
+candidate ranking
+
+ ---
 
 # Features
 
@@ -144,20 +181,35 @@ The objective was not merely maximizing raw accuracy, but achieving useful real-
 
 ---
 
+```markdown id="m3x7tn"
 # Project Structure
 
 ```text
 TransitAI/
 │
-├── main.py
-├── inference.py
-├── preprocess.py
-├── model.py
-├── tess_precision_recall_model_hardfp.pth
-├── tess_cache.db
-├── icon.ico
-└── README.md
-```
+├── README.md
+├── requirements.txt
+├── .env
+│
+├── app/
+│   └── streamlit_app.py
+│
+├── cache/
+│
+├── direct_ml/
+│   ├── inference_dml.py
+│   └── README.md
+│
+├── model/
+│   └── tess_precision_recall_model_hardfp.pth
+│
+└── src/
+    ├── __init__.py
+    ├── config.py
+    ├── inference.py
+    ├── main.py
+    ├── model.py
+    └── preprocess.py
 
 ---
 
@@ -190,37 +242,6 @@ pip install requests
 
 ```bash
 python main.py
-```
-
----
-
-# Packaging as EXE
-
-Install PyInstaller:
-
-```bash
-pip install pyinstaller
-```
-
-Build executable:
-
-```bash
-pyinstaller ^
---name "TransitAI" ^
---onefile ^
---windowed ^
---icon icon.ico ^
---collect-all astroquery ^
---collect-all astropy ^
---collect-all torch ^
---add-data "tess_precision_recall_model_hardfp.pth;." ^
-main.py
-```
-
-Generated executable:
-
-```text
-dist/TransitAI.exe
 ```
 
 ---
@@ -277,6 +298,46 @@ Potential future directions include:
 - multi-sector aggregation
 - GPU acceleration
 - cloud synchronization
+
+```markdown id="n4k8vq"
+---
+
+# Long-Term Vision
+
+TransitAI is designed with a modular architecture that supports future expansion into a large-scale automated astronomical analysis pipeline.
+
+The long-term objective is to evolve the system from:
+- a manual desktop inference application
+
+into:
+- an AI-powered automated exoplanet survey and candidate analysis platform.
+
+Planned future capabilities include:
+
+- automatic synchronization of new TESS observations,
+- continuous ingestion pipelines,
+- autonomous batch processing,
+- persistent candidate databases,
+- sector-wise automated analysis,
+- large-scale candidate ranking systems,
+- and Full Frame Image (FFI) extraction support.
+
+Future architecture vision:
+
+```text
+automatic TESS synchronization
+↓
+continuous ingestion
+↓
+preprocessing pipeline
+↓
+batch inference
+↓
+candidate database
+↓
+ranking and filtering
+↓
+scientific review
 
 ---
 
