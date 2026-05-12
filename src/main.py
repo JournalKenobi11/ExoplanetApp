@@ -7,10 +7,6 @@ from PySide6.QtCore import (
     Signal,
 )
 
-from PySide6.QtGui import (
-    QIcon,
-)
-
 from PySide6.QtWidgets import (
     QApplication,
     QWidget,
@@ -23,7 +19,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
 )
 
-from inference import run_inference
+from src.inference import run_inference
 
 
 class Worker(QThread):
@@ -82,10 +78,6 @@ class ExoplanetApp(QWidget):
 
         self.setWindowTitle(
             "TransitAI - Exoplanet Candidate Finder"
-        )
-
-        self.setWindowIcon(
-            QIcon("icon.ico")
         )
 
         self.resize(900, 600)

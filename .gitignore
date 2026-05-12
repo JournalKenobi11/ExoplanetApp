@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+
+cache/*.db
+cache/*.sqlite
+
+dist/
+build/
+
+.env

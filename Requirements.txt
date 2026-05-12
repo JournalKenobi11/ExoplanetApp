@@ -7,3 +7,4 @@ lightkurve
 PySide6
 matplotlib
 scipy
+python-dotenv
