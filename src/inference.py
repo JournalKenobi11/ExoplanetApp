@@ -13,13 +13,13 @@ from astropy.io import fits
 from astroquery.mast import Observations
 from astropy.utils.exceptions import AstropyWarning
 
-from preprocess import (
+from src.preprocess import (
     zscore_signal,
     generate_fft_features,
     bls_extract,
 )
 
-from model import TessPrecisionRecallNet
+from src.model import TessPrecisionRecallNet
 
 
 warnings.simplefilter(
