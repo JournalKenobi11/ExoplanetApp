@@ -125,7 +125,11 @@ f1: 0.091967
 pr_auc: 0.621095
 
 experimental run 3c
-VALIDATION:loss: 0.370119precision: 0.180218recall: 0.757066f1: 0.291132pr_auc: 0.588452
+VALIDATION:loss: 0.370119
+precision: 0.180218
+recall: 0.757066
+f1: 0.291132
+pr_auc: 0.588452
 
 experimental idea 5
 loss: 0.396959
@@ -135,9 +139,11 @@ f1: 0.533827
 pr_auc: 0.654290
 
 
- experimental idea 6
- loss: 0.396959
-precision: 0.739385
-recall: 0.417701
-f1: 0.533827
-pr_auc: 0.654290
+experimental idea 6
+loss: 0.341318
+precision: 0.233397
+recall: 0.848276
+f1: 0.366071
+pr_auc: 0.403227 
+
+

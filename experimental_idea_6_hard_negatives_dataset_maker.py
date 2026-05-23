@@ -1,16 +1,19 @@
 # ============================================================
-# NORMAL MULTISCALE DATASET MAKER
-# NO FOLDING
-# NO CHUNK CLASSIFICATION
+# HARD-NEGATIVE MULTISCALE DATASET MAKER
+# SCIENTIFICALLY CONSTRAINED VERSION
+#
+# GOAL:
+# - candidate-centered detection
+# - multiscale representation
+# - hard-negative mining
+# - remove trivial negatives
 #
 # REPRESENTATION:
-# 1. LOCAL TRANSIT WINDOW
-# 2. BROADER CONTEXT WINDOW
+# 1. LOCAL WINDOW (1024)
+# 2. GLOBAL CONTEXT (4096 pooled)
 #
-# THIS IS:
-# candidate-centered
-# multiscale
-# blind-search compatible
+# NEGATIVES:
+# ONLY hardest transit-like candidates retained
 # ============================================================
 
 import os
@@ -45,12 +48,12 @@ NEGATIVE_DATASETS = [
 ]
 
 OUTPUT_CSV = (
-    "tess_multiscale_dataset.csv"
+    "tess_hard_negative_multiscale_dataset.csv"
 )
 
 
 # ============================================================
-# PARAMETERS
+# REPRESENTATION PARAMETERS
 # ============================================================
 
 LOCAL_WINDOW = 1024
@@ -63,15 +66,29 @@ GLOBAL_POOLED = (
     GLOBAL_WINDOW // GLOBAL_POOL
 )
 
+
+# ============================================================
+# SCIENTIFIC FILTER PARAMETERS
+# ============================================================
+
 DETREND_KERNEL = 401
 
 GAP_THRESHOLD = 0.02
 
 MIN_CHUNK_POINTS = 4500
 
-DEPTH_SIGMA = 3.0
 
-MAX_NEGATIVE_CANDIDATES = 3
+
+MAX_EVENT_WIDTH = 120
+
+
+MAX_NEGATIVE_PER_CHUNK = 1
+
+MAX_POSITIVE_PER_CHUNK = 2
+
+DEPTH_SIGMA = 3.5
+MIN_SNR = 3.0
+MIN_EVENT_WIDTH = 3
 
 
 # ============================================================
@@ -89,7 +106,7 @@ planet_df["tic_id"] = (
 
 
 # ============================================================
-# HEADER
+# CSV HEADER
 # ============================================================
 
 header = [
@@ -108,7 +125,9 @@ header = [
 
     "candidate_depth",
 
-    "candidate_snr"
+    "candidate_snr",
+
+    "event_width"
 ]
 
 for i in range(LOCAL_WINDOW):
@@ -154,19 +173,21 @@ negative_samples = 0
 
 
 # ============================================================
-# NORMALIZE
+# NORMALIZATION
 # ============================================================
 
 def normalize_flux(flux):
 
-    median = np.median(
+    median_flux = np.median(
         flux
     )
 
-    if median == 0:
+    if median_flux == 0:
         return None
 
-    flux = flux / median
+    flux = (
+        flux / median_flux
+    )
 
     return flux.astype(
         np.float32
@@ -269,109 +290,7 @@ def split_chunks(
 
 
 # ============================================================
-# DETECT CANDIDATES
-# ============================================================
-
-def detect_candidates(flux):
-
-    detrended = detrend_flux(
-        flux
-    )
-
-    residual = (
-        detrended
-        -
-        np.median(detrended)
-    )
-
-    sigma = np.std(
-        residual
-    )
-
-    threshold = (
-        -DEPTH_SIGMA * sigma
-    )
-
-    candidate_idx = np.where(
-        residual < threshold
-    )[0]
-
-    if len(candidate_idx) == 0:
-        return []
-
-    groups = []
-
-    current = [
-        candidate_idx[0]
-    ]
-
-    for idx in candidate_idx[1:]:
-
-        if (
-            idx
-            -
-            current[-1]
-            <= 10
-        ):
-
-            current.append(idx)
-
-        else:
-
-            groups.append(current)
-
-            current = [idx]
-
-    groups.append(current)
-
-    candidates = []
-
-    for group in groups:
-
-        center = group[
-            np.argmin(
-                flux[group]
-            )
-        ]
-
-        depth = (
-            np.median(flux)
-            -
-            flux[center]
-        )
-
-        snr = (
-            depth
-            /
-            (sigma + 1e-8)
-        )
-
-        candidates.append({
-
-            "center":
-                center,
-
-            "depth":
-                depth,
-
-            "snr":
-                snr
-        })
-
-    candidates = sorted(
-
-        candidates,
-
-        key=lambda x: x["snr"],
-
-        reverse=True
-    )
-
-    return candidates
-
-
-# ============================================================
-# PAD EXTRACTION
+# WINDOW EXTRACTION
 # ============================================================
 
 def extract_window(
@@ -424,7 +343,7 @@ def extract_window(
 
 
 # ============================================================
-# POOL GLOBAL
+# GLOBAL POOLING
 # ============================================================
 
 def pool_global(flux):
@@ -449,7 +368,7 @@ def pool_global(flux):
 
 
 # ============================================================
-# LABEL TRANSIT
+# TRANSIT CONTAINMENT
 # ============================================================
 
 def contains_transit(
@@ -524,6 +443,123 @@ def contains_transit(
 
 
 # ============================================================
+# HARD CANDIDATE DETECTION
+# ============================================================
+
+def detect_hard_candidates(flux):
+
+    detrended = detrend_flux(
+        flux
+    )
+
+    residual = (
+        detrended
+        -
+        np.median(detrended)
+    )
+
+    sigma = np.std(
+        residual
+    )
+
+    threshold = (
+        -DEPTH_SIGMA * sigma
+    )
+
+    dip_idx = np.where(
+        residual < threshold
+    )[0]
+
+    if len(dip_idx) == 0:
+        return []
+
+    groups = []
+
+    current = [
+        dip_idx[0]
+    ]
+
+    for idx in dip_idx[1:]:
+
+        if (
+            idx
+            -
+            current[-1]
+            <= 3
+        ):
+
+            current.append(idx)
+
+        else:
+
+            groups.append(current)
+
+            current = [idx]
+
+    groups.append(current)
+
+    candidates = []
+
+    for group in groups:
+
+        width = len(group)
+
+        if (
+            width < MIN_EVENT_WIDTH
+            or
+            width > MAX_EVENT_WIDTH
+        ):
+            continue
+
+        center = group[
+            np.argmin(
+                flux[group]
+            )
+        ]
+
+        depth = (
+            np.median(flux)
+            -
+            flux[center]
+        )
+
+        snr = (
+            depth
+            /
+            (sigma + 1e-8)
+        )
+
+        if snr < MIN_SNR:
+            continue
+
+        candidates.append({
+
+            "center":
+                center,
+
+            "depth":
+                depth,
+
+            "snr":
+                snr,
+
+            "width":
+                width
+        })
+
+    candidates = sorted(
+
+        candidates,
+
+        key=lambda x: x["snr"],
+
+        reverse=True
+    )
+
+    return candidates
+
+
+# ============================================================
 # WRITE SAMPLE
 # ============================================================
 
@@ -540,6 +576,7 @@ def write_sample(
 
     depth,
     snr,
+    width,
 
     local_view,
     global_view
@@ -564,7 +601,8 @@ def write_sample(
         candidate_time,
 
         depth,
-        snr
+        snr,
+        width
     ]
 
     row.extend(local_view)
@@ -639,14 +677,20 @@ def process_star(
             if flux_norm is None:
                 continue
 
-            candidates = detect_candidates(
+            candidates = detect_hard_candidates(
                 flux_norm
             )
 
-            if label_mode != "planet":
+            if label_mode == "planet":
 
                 candidates = candidates[
-                    :MAX_NEGATIVE_CANDIDATES
+                    :MAX_POSITIVE_PER_CHUNK
+                ]
+
+            else:
+
+                candidates = candidates[
+                    :MAX_NEGATIVE_PER_CHUNK
                 ]
 
             for candidate_id, c in enumerate(candidates):
@@ -710,6 +754,7 @@ def process_star(
 
                     c["depth"],
                     c["snr"],
+                    c["width"],
 
                     local_view,
                     global_view
