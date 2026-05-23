@@ -447,8 +447,69 @@ model = PlanetCNN().to(
 # ============================================================
 # LOSS
 # ============================================================
+class FocalLoss(nn.Module):
 
-criterion = nn.BCEWithLogitsLoss()
+    def __init__(
+
+        self,
+
+        alpha=0.75,
+
+        gamma=2.0
+    ):
+
+        super().__init__()
+
+        self.alpha = alpha
+
+        self.gamma = gamma
+
+    def forward(
+
+        self,
+        logits,
+        targets
+    ):
+
+        bce = nn.functional.binary_cross_entropy_with_logits(
+
+            logits,
+            targets,
+
+            reduction="none"
+        )
+
+        probs = torch.sigmoid(
+            logits
+        )
+
+        pt = torch.where(
+
+            targets == 1,
+
+            probs,
+
+            1 - probs
+        )
+
+        focal_weight = (
+
+            self.alpha
+            *
+            (1 - pt).pow(self.gamma)
+        )
+
+        loss = (
+            focal_weight
+            *
+            bce
+        )
+
+        return loss.mean()
+criterion = FocalLoss(
+    alpha=0.75,
+    gamma=2.0
+)
 
 
 # ============================================================

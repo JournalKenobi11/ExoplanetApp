@@ -123,3 +123,6 @@ precision: 0.048217
 recall: 0.992784 
 f1: 0.091967 
 pr_auc: 0.621095
+
+experimental run 3c
+VALIDATION:loss: 0.370119precision: 0.180218recall: 0.757066f1: 0.291132pr_auc: 0.588452
