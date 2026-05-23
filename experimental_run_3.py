@@ -42,8 +42,6 @@ WINDOW_SIZE = 1024
 
 PATIENCE = 5
 
-POS_WEIGHT = 10.0
-
 RANDOM_STATE = 42
 
 
@@ -298,7 +296,7 @@ test_loader = DataLoader(
 
 
 # ============================================================
-# CNN MODEL
+# MODEL
 # ============================================================
 
 class PlanetCNN(nn.Module):
@@ -312,8 +310,8 @@ class PlanetCNN(nn.Module):
             nn.Conv1d(
                 1,
                 32,
-                kernel_size=7,
-                padding=3
+                kernel_size=11,
+                padding=5
             ),
 
             nn.BatchNorm1d(32),
@@ -326,8 +324,8 @@ class PlanetCNN(nn.Module):
             nn.Conv1d(
                 32,
                 64,
-                kernel_size=7,
-                padding=3
+                kernel_size=9,
+                padding=4
             ),
 
             nn.BatchNorm1d(64),
@@ -340,8 +338,8 @@ class PlanetCNN(nn.Module):
             nn.Conv1d(
                 64,
                 128,
-                kernel_size=5,
-                padding=2
+                kernel_size=7,
+                padding=3
             ),
 
             nn.BatchNorm1d(128),
@@ -360,18 +358,43 @@ class PlanetCNN(nn.Module):
 
             nn.BatchNorm1d(256),
 
+            nn.ReLU(),
+
+
+            nn.Conv1d(
+                256,
+                256,
+                kernel_size=5,
+                padding=2
+            ),
+
+            nn.BatchNorm1d(256),
+
             nn.ReLU()
         )
 
-        self.global_pool = (
+        self.global_avg_pool = (
+            nn.AdaptiveAvgPool1d(1)
+        )
+
+        self.global_max_pool = (
             nn.AdaptiveMaxPool1d(1)
         )
 
         self.classifier = nn.Sequential(
 
             nn.Linear(
+                512,
+                256
+            ),
+
+            nn.ReLU(),
+
+            nn.Dropout(0.4),
+
+            nn.Linear(
                 256,
-                128
+                64
             ),
 
             nn.ReLU(),
@@ -379,7 +402,7 @@ class PlanetCNN(nn.Module):
             nn.Dropout(0.3),
 
             nn.Linear(
-                128,
+                64,
                 1
             )
         )
@@ -392,9 +415,20 @@ class PlanetCNN(nn.Module):
 
         x = self.features(x)
 
-        x = self.global_pool(x)
+        avg_pool = (
+            self.global_avg_pool(x)
+            .squeeze(-1)
+        )
 
-        x = x.squeeze(-1)
+        max_pool = (
+            self.global_max_pool(x)
+            .squeeze(-1)
+        )
+
+        x = torch.cat(
+            [avg_pool, max_pool],
+            dim=1
+        )
 
         x = self.classifier(x)
 
@@ -414,29 +448,25 @@ model = PlanetCNN().to(
 # LOSS
 # ============================================================
 
-criterion = nn.BCEWithLogitsLoss(
-
-    pos_weight=torch.tensor(
-        [POS_WEIGHT],
-        device=device
-    )
-)
+criterion = nn.BCEWithLogitsLoss()
 
 
 # ============================================================
 # OPTIMIZER
 # ============================================================
 
-optimizer = optim.Adam(
+optimizer = optim.AdamW(
 
     model.parameters(),
 
-    lr=LEARNING_RATE
+    lr=LEARNING_RATE,
+
+    weight_decay=1e-4
 )
 
 
 # ============================================================
-# VALIDATION FUNCTION
+# EVALUATION
 # ============================================================
 
 def evaluate(
@@ -543,7 +573,7 @@ def evaluate(
 
 
 # ============================================================
-# TRAINING LOOP
+# TRAINING
 # ============================================================
 
 best_pr_auc = 0.0
@@ -579,6 +609,11 @@ for epoch in range(EPOCHS):
         )
 
         loss.backward()
+
+        torch.nn.utils.clip_grad_norm_(
+            model.parameters(),
+            1.0
+        )
 
         optimizer.step()
 

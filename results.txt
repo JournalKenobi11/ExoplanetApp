@@ -117,3 +117,9 @@ TOP FALSE POSITIVES
 11632  116608612      43          4               0.976679
 
 
+experimental_run_3b.py 
+VALIDATION: loss: 1.435983 
+precision: 0.048217 
+recall: 0.992784 
+f1: 0.091967 
+pr_auc: 0.621095
