@@ -160,3 +160,10 @@ precision: 0.601699
 recall: 0.742293
 f1: 0.664643
 pr_auc: 0.780359
+
+experimental idea 5g
+threshold: 0.34
+precision: 0.539032
+recall: 0.851418
+f1: 0.660134
+pr_auc: 0.747996
